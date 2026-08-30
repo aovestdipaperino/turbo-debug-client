@@ -1,0 +1,28 @@
+[package]
+name = "turbo-debug-client"
+version = "0.1.0"
+description = "Client for turbo-debug-console: performs the HELLO handshake and hands you a socket to stream at"
+edition = "2024"
+rust-version = "1.93"
+authors = ["Enzo Lombardi <enzinol@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/aovestdipaperino/turbo-debug-client"
+keywords = ["debugging", "tracing", "logging", "terminal", "socket"]
+categories = ["development-tools::debugging", "command-line-interface"]
+readme = "README.md"
+
+[features]
+# A `MakeWriter` so `tracing-subscriber` can write straight to the socket.
+tracing = ["dep:tracing-subscriber"]
+
+[dependencies]
+tracing-subscriber = { version = "0.3.23", optional = true, default-features = false, features = ["fmt", "std"] }
+
+[lints.rust]
+missing_debug_implementations = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
