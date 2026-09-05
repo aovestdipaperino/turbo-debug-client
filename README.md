@@ -27,6 +27,21 @@ the same window, below a `-- reconnected --` rule, with the previous output
 still there. Restarting the program you are debugging accumulates runs instead
 of losing them, which is the whole reason the handshake carries a name.
 
+## Checking for a console without dialing
+
+A program that mirrors to the console only when one happens to be running can
+ask first, with two syscalls and no network I/O:
+
+```rust
+if turbo_debug_client::is_console_running() {
+    let sock = connect(StreamKind::Tokens, "build")?;
+    // ...
+}
+```
+
+The console holds an exclusive `flock` on a well-known temp file for its whole
+lifetime, so the answer is exact and never stale after a crash.
+
 ## Sending `tracing` records
 
 With the `tracing` feature, records go to a window with their levels coloured,

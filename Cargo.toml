@@ -1,6 +1,6 @@
 [package]
 name = "turbo-debug-client"
-version = "0.1.0"
+version = "0.2.0"
 description = "Client for turbo-debug-console: performs the HELLO handshake and hands you a socket to stream at"
 edition = "2024"
 rust-version = "1.93"
@@ -16,6 +16,7 @@ readme = "README.md"
 tracing = ["dep:tracing-subscriber"]
 
 [dependencies]
+libc = "0.2"
 tracing-subscriber = { version = "0.3.23", optional = true, default-features = false, features = ["fmt", "std"] }
 
 [lints.rust]

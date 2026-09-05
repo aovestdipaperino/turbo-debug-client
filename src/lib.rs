@@ -22,16 +22,56 @@
 //! previous output still there, so restarting the program you are debugging
 //! accumulates runs instead of losing them.
 //!
+//! Before dialing, [`is_console_running`] answers "is a console up?" with two
+//! syscalls and no network I/O, so an optional debug mirror can stay silent
+//! and cheap when nobody is listening.
+//!
 //! [`turbo-debug-console`]: https://crates.io/crates/turbo-debug-console
 
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
+use std::os::unix::io::AsRawFd;
+use std::path::Path;
 
 /// The console's well-known control port.
 pub const CONTROL_PORT: u16 = 7878;
 
 /// The handshake version this client speaks.
 pub const PROTOCOL_VERSION: u32 = 1;
+
+/// The well-known file a running console holds an exclusive `flock(2)` on for
+/// its whole lifetime, in the temp directory. Must match the console's own
+/// `liveness::LOCK_NAME`.
+const LOCK_NAME: &str = "turbo-debug-console.lock";
+
+/// Is a console currently running on this machine?
+///
+/// Cheaper than opening a TCP connection to the control port: two syscalls
+/// (`open` + `flock`) and no network stack. The console holds an exclusive
+/// advisory lock on a well-known temp file for its lifetime; this requests a
+/// non-blocking *shared* lock, which fails with `EWOULDBLOCK` exactly when a
+/// console is up. The kernel drops the lock the instant the console exits or
+/// crashes, so unlike a PID file it never lies after a crash.
+///
+/// Returns `false` when no console has ever run (the file is absent) or the
+/// temp directory is unusable: both mean "no console we can see". Any number
+/// of callers may check concurrently; shared locks do not exclude each other.
+#[must_use]
+pub fn is_console_running() -> bool {
+    is_console_running_at(&std::env::temp_dir().join(LOCK_NAME))
+}
+
+fn is_console_running_at(path: &Path) -> bool {
+    // Read-only, never create: only the console creates the file.
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    // SAFETY: `flock` takes an fd and an operation bitmask and performs no
+    // memory I/O; the fd is the valid descriptor of `file`, owned for this call.
+    let got_shared = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) } == 0;
+    !got_shared
+}
 
 /// What the console should make of the bytes you send.
 ///
@@ -81,11 +121,7 @@ pub fn connect(kind: StreamKind, name: &str) -> std::io::Result<TcpStream> {
 /// As [`connect`].
 pub fn connect_on(control_port: u16, kind: StreamKind, name: &str) -> std::io::Result<TcpStream> {
     let mut control = TcpStream::connect(("127.0.0.1", control_port))?;
-    writeln!(
-        control,
-        "HELLO {PROTOCOL_VERSION} {} {name}",
-        kind.as_str()
-    )?;
+    writeln!(control, "HELLO {PROTOCOL_VERSION} {} {name}", kind.as_str())?;
     control.flush()?;
 
     let mut reply = String::new();
@@ -113,6 +149,39 @@ pub use writer::SocketWriter;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn lock_test_path(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "turbo-debug-client-test-{}-{tag}.lock",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn no_lock_file_means_no_console() {
+        let path = lock_test_path("absent");
+        let _ = std::fs::remove_file(&path);
+        assert!(!is_console_running_at(&path));
+    }
+
+    #[test]
+    fn an_exclusive_holder_reads_as_running_until_it_lets_go() {
+        let path = lock_test_path("held");
+        let _ = std::fs::remove_file(&path);
+        let holder = File::create(&path).unwrap();
+        // SAFETY: valid fd owned by `holder`.
+        assert_eq!(
+            unsafe { libc::flock(holder.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+            0
+        );
+        assert!(
+            is_console_running_at(&path),
+            "exclusive lock held: console up"
+        );
+        drop(holder);
+        assert!(!is_console_running_at(&path), "lock released: console gone");
+        let _ = std::fs::remove_file(&path);
+    }
 
     #[test]
     fn kinds_use_the_wire_words_the_console_parses() {
