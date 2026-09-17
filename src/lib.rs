@@ -43,7 +43,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The well-known file a running console holds an exclusive `flock(2)` on for
 /// its whole lifetime, in the temp directory. Must match the console's own
 /// `liveness::LOCK_NAME`.
-const LOCK_NAME: &str = "turbo-debug-console.lock";
+const LOCK_NAME: &str = "tdk.lock";
 
 /// Is a console currently running on this machine?
 ///

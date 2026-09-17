@@ -1,6 +1,6 @@
 [package]
 name = "turbo-debug-client"
-version = "0.2.0"
+version = "0.2.1"
 description = "Client for turbo-debug-console: performs the HELLO handshake and hands you a socket to stream at"
 edition = "2024"
 rust-version = "1.93"
