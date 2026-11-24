@@ -1,5 +1,7 @@
 # turbo-debug-client
 
+[![GitHub stars](https://img.shields.io/github/stars/aovestdipaperino/turbo-debug-client?logo=github&color=brightgreen)](https://github.com/aovestdipaperino/turbo-debug-client/stargazers)
+
 Client for [`turbo-debug-console`](https://crates.io/crates/turbo-debug-console),
 a Turbo Vision debug console for live streams.
 
